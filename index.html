@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Une info, pas si simple !</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #1a1a2e;
+      color: #fff;
+      font-family: 'Courier New', monospace;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    body.scrollable {
+      overflow-y: auto;
+      align-items: flex-start;
+    }
+
+    /* ── ÉCRANS ── */
+    .screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100vw;
+      min-height: 100vh;
+      padding: 20px;
+      text-align: center;
+    }
+    .screen.active { display: flex; }
+
+    /* ── TITRES ── */
+    h1 {
+      font-size: clamp(1.8rem, 5vw, 3.2rem);
+      color: #ff2d78;
+      text-shadow: 3px 3px 0 #000, -1px -1px 0 #000;
+      margin-bottom: 1rem;
+      line-height: 1.2;
+    }
+    h2 {
+      font-size: clamp(1.2rem, 3vw, 2rem);
+      color: #00ff88;
+      text-shadow: 2px 2px 0 #000;
+      margin-bottom: 1.5rem;
+    }
+    p { font-size: 1rem; color: #ccc; margin-bottom: 1rem; }
+
+    /* ── BOUTONS ── */
+    .btn {
+      background: #ff2d78;
+      color: #fff;
+      border: 3px solid #000;
+      font-family: 'Courier New', monospace;
+      font-size: 1.1rem;
+      font-weight: bold;
+      padding: 14px 32px;
+      margin: 8px;
+      cursor: pointer;
+      box-shadow: 4px 4px 0 #000;
+      transition: transform 0.08s, box-shadow 0.08s;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .btn:hover {
+      transform: translate(-2px, -2px);
+      box-shadow: 6px 6px 0 #000;
+    }
+    .btn:active {
+      transform: translate(2px, 2px);
+      box-shadow: 2px 2px 0 #000;
+    }
+    .btn.green { background: #00ff88; color: #000; }
+    .btn.yellow { background: #ffd700; color: #000; }
+    .btn.grey { background: #555; color: #fff; }
+    .btn:disabled { background: #333; color: #666; cursor: not-allowed; box-shadow: 2px 2px 0 #000; transform: none; }
+
+    /* ── SÉLECTION DIFFICULTÉ ── */
+    .diff-grid { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; margin-top: 12px; }
+    .diff-card {
+      background: #0d0d1a;
+      border: 3px solid #000;
+      box-shadow: 4px 4px 0 #000;
+      padding: 20px 28px;
+      cursor: pointer;
+      transition: transform 0.08s, box-shadow 0.08s;
+      min-width: 140px;
+    }
+    .diff-card:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 #000; }
+    .diff-card .label { font-size: 1.3rem; font-weight: bold; }
+    .diff-card .desc { font-size: 0.8rem; color: #aaa; margin-top: 4px; }
+    .diff-card.facile .label { color: #00ff88; }
+    .diff-card.moyen .label { color: #ffd700; }
+    .diff-card.difficile .label { color: #ff2d78; }
+
+    /* ── JEU ── */
+    #gameCanvas {
+      border: 3px solid #ff2d78;
+      box-shadow: 0 0 20px #ff2d7866;
+      display: block;
+      max-width: 100%;
+    }
+    #gameUI {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      max-width: 700px;
+      padding: 8px 4px;
+    }
+    #gameUI .info { color: #00ff88; font-size: 0.9rem; }
+    #jumpHint { color: #ffd700; font-size: 0.85rem; animation: blink 1.2s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* ── VICTOIRE / GAME OVER ── */
+    .result-emoji { font-size: 4rem; margin-bottom: 0.5rem; }
+    .btn-group { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 8px; }
+
+    /* ── DASHBOARD ── */
+    #screen-dashboard { justify-content: flex-start; padding-top: 30px; min-height: 100vh; }
+    #screen-dashboard h1 { font-size: clamp(1.4rem, 3vw, 2rem); margin-bottom: 0.5rem; }
+    #apiGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+      width: 100%;
+      max-width: 960px;
+      margin-top: 16px;
+      padding: 0 8px;
+    }
+    .api-card {
+      background: #0d0d1a;
+      border: 3px solid #000;
+      box-shadow: 4px 4px 0 #000;
+      padding: 18px;
+      text-align: left;
+      position: relative;
+    }
+    .api-card .api-icon { font-size: 2rem; }
+    .api-card .api-title {
+      font-size: 0.75rem;
+      color: #ff2d78;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin: 4px 0;
+      font-weight: bold;
+    }
+    .api-card .api-content { font-size: 1rem; color: #fff; line-height: 1.4; }
+    .api-card .api-content.loading { color: #555; font-style: italic; }
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid #333;
+      border-top-color: #ff2d78;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .reveal-btn {
+      background: #222;
+      color: #ffd700;
+      border: 2px solid #ffd700;
+      font-family: 'Courier New', monospace;
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      cursor: pointer;
+      margin-top: 8px;
+      display: block;
+    }
+    .reveal-btn:hover { background: #ffd700; color: #000; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════
+     ÉCRAN 1 : ACCUEIL
+════════════════════════════════════════════════ -->
+<div id="screen-accueil" class="screen active">
+  <h1>Une info,<br>pas si simple !</h1>
+  <p>Les infos, ça se mérite.<br>Prouve que t'en veux.</p>
+  <button class="btn" onclick="goTo('screen-selection')" style="margin-top:24px;font-size:1.3rem;padding:18px 48px;">
+    Obtenir des infos
+  </button>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     ÉCRAN 2 : SÉLECTION DIFFICULTÉ
+════════════════════════════════════════════════ -->
+<div id="screen-selection" class="screen">
+  <h2>Choisis ton niveau</h2>
+  <p>Tu dois en valider <strong>au moins un</strong> pour accéder aux infos.</p>
+  <div class="diff-grid">
+    <div class="diff-card facile" onclick="startGame('facile')">
+      <div class="label">FACILE</div>
+      <div class="desc">Pour les débutants<br>~ 20 secondes</div>
+    </div>
+    <div class="diff-card moyen" onclick="startGame('moyen')">
+      <div class="label">MOYEN</div>
+      <div class="desc">Ça se corse<br>~ 40 secondes</div>
+    </div>
+    <div class="diff-card difficile" onclick="startGame('difficile')">
+      <div class="label">DIFFICILE</div>
+      <div class="desc">Bonne chance<br>~ 60 secondes</div>
+    </div>
+  </div>
+  <button class="btn grey" onclick="goTo('screen-accueil')" style="margin-top:24px;">← Retour</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     ÉCRAN 3 : JEU
+════════════════════════════════════════════════ -->
+<div id="screen-jeu" class="screen">
+  <div id="gameUI">
+    <span class="info" id="diffLabel">FACILE</span>
+    <span id="jumpHint">CLIC ou ESPACE pour sauter</span>
+    <span class="info" id="progressLabel">0%</span>
+  </div>
+  <canvas id="gameCanvas" width="700" height="360"></canvas>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     ÉCRAN 4 : VICTOIRE
+════════════════════════════════════════════════ -->
+<div id="screen-victoire" class="screen">
+  <div class="result-emoji" id="victory-emoji">🎉</div>
+  <div id="victory-stars" style="font-size:2.2rem;margin-bottom:0.5rem;letter-spacing:6px;"></div>
+  <h1 id="victory-title">Niveau validé !</h1>
+  <p id="victory-msg">Tu as mérité tes infos.<br>Ou tu veux encore souffrir ?</p>
+  <div class="btn-group">
+    <button class="btn green" onclick="goTo('screen-dashboard')">Accéder aux informations →</button>
+    <button class="btn yellow" onclick="goTo('screen-selection')">Un autre niveau ?</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     ÉCRAN 4b : VICTOIRE LÉGENDAIRE (Difficile)
+════════════════════════════════════════════════ -->
+<div id="screen-legendaire" class="screen" style="background:radial-gradient(ellipse at center,#2a1f00 0%,#1a1a2e 70%);">
+  <div style="font-size:5rem;animation:crown-bounce 0.6s infinite alternate;">👑</div>
+  <h1 style="color:#ffd700;font-size:clamp(2rem,6vw,4rem);text-shadow:0 0 20px #ffd700,3px 3px 0 #000;">LÉGENDAIRE !</h1>
+  <p style="color:#ffd700;font-size:1.1rem;">Tu as complété le niveau <strong>DIFFICILE</strong>.<br>Tu es complètement fou. Respect.</p>
+  <div style="margin:16px 0;font-size:1.8rem;letter-spacing:8px;">⭐⭐⭐</div>
+  <div class="btn-group">
+    <button class="btn" style="background:#ffd700;color:#000;font-size:1.1rem;" onclick="goTo('screen-dashboard')">Réclamer mes infos 👑</button>
+    <button class="btn yellow" onclick="goTo('screen-selection')">Un autre niveau ?</button>
+  </div>
+</div>
+<style>
+@keyframes crown-bounce   { from { transform: translateY(0) rotate(-8deg); } to { transform: translateY(-14px) rotate(8deg); } }
+@keyframes confetti-fall  { 0% { top: -24px; opacity:1; } 100% { top: 110vh; opacity: 0.6; } }
+@keyframes confetti-spin  { 0% { transform: rotate(0deg) scaleX(1); } 50% { transform: rotate(180deg) scaleX(0.3); } 100% { transform: rotate(360deg) scaleX(1); } }
+</style>
+
+<!-- ═══════════════════════════════════════════════
+     ÉCRAN 5 : GAME OVER
+════════════════════════════════════════════════ -->
+<div id="screen-gameover" class="screen">
+  <div class="result-emoji">💀</div>
+  <h1>Game Over</h1>
+  <p id="gameoverMsg">T'es nul. Réessaie.</p>
+  <div class="btn-group">
+    <button class="btn" onclick="retryGame()">Réessayer</button>
+    <button class="btn grey" onclick="goTo('screen-accueil')">Retour à l'accueil</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     ÉCRAN 6 : DASHBOARD
+════════════════════════════════════════════════ -->
+<div id="screen-dashboard" class="screen">
+  <h1>Tes infos, bien méritées !</h1>
+  <p style="color:#00ff88;">Contenu chargé en temps réel via APIs gratuites</p>
+  <div id="apiGrid"></div>
+  <div class="btn-group" style="margin-top:20px;">
+    <button class="btn yellow" onclick="goTo('screen-selection')">Un autre niveau ?</button>
+    <button class="btn grey" onclick="goTo('screen-accueil')">Retour à l'accueil</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+let niveauValide = false;
+let currentDiff  = 'facile';
+let gameLoop     = null;
+
+// ── MOT DE PASSE SECRET ──
+let secretBuffer = '';
+document.addEventListener('keypress', e => {
+  secretBuffer = (secretBuffer + e.key).slice(-4);
+  if (secretBuffer === 'mofy') {
+    niveauValide = true;
+    launchConfetti();
+    showToast('🔓 Mode dev activé — bonne triche !');
+    goTo('screen-dashboard');
+  }
+});
+function showVictoireNormale(diff) {
+  const BRONZE = '<span style="color:#cd7f32">★</span><span style="color:#333">★★</span>';
+  const SILVER = '<span style="color:#c0c0c0">★★</span><span style="color:#333">★</span>';
+  const configs = {
+    facile: {
+      stars: BRONZE,
+      emoji: '😌',
+      title: 'Pas mal… pour un débutant.',
+      msg: 'T\'as eu de la chance.<br>Mais bon, tu as ta récompense.',
+    },
+    moyen: {
+      stars: SILVER,
+      emoji: '😎',
+      title: 'Bien joué !',
+      msg: 'Deux étoiles. Tu mérites tes infos.<br>Ou tu veux tenter le Difficile ?',
+    },
+  };
+  const c = configs[diff] || configs.facile;
+  document.getElementById('victory-emoji').textContent = c.emoji;
+  document.getElementById('victory-stars').innerHTML   = c.stars;
+  document.getElementById('victory-title').textContent = c.title;
+  document.getElementById('victory-msg').innerHTML     = c.msg;
+  goTo('screen-victoire');
+}
+
+function showVictoireLegendaire() {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-legendaire').classList.add('active');
+}
+
+function launchConfetti() {
+  const colors = ['#ff2d78','#00ff88','#ffd700','#ff6b35','#c0c0c0','#fff','#a78bfa'];
+  for (let i = 0; i < 90; i++) {
+    const el    = document.createElement('div');
+    const size  = 6 + Math.random() * 9;
+    const dur   = 1.8 + Math.random() * 2;
+    const delay = Math.random() * 1.8;
+    const isCircle = Math.random() > 0.5;
+    el.style.cssText = [
+      'position:fixed',
+      `left:${Math.random() * 100}vw`,
+      'top:-24px',
+      `width:${size}px`,
+      `height:${isCircle ? size : size * 1.6}px`,
+      `background:${colors[Math.floor(Math.random() * colors.length)]}`,
+      `border-radius:${isCircle ? '50%' : '2px'}`,
+      `animation:confetti-fall ${dur}s linear ${delay}s forwards,confetti-spin ${dur * 0.8}s ease-in-out ${delay}s infinite`,
+      'z-index:9997',
+      'pointer-events:none',
+    ].join(';');
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), (dur + delay + 0.5) * 1000);
+  }
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.textContent = msg;
+  t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#ffd700;color:#000;font-family:Courier New,monospace;font-weight:bold;padding:10px 22px;border:3px solid #000;box-shadow:4px 4px 0 #000;z-index:9999;font-size:0.95rem;';
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2800);
+}
+
+// ═══════════════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════════════
+function goTo(screenId) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(screenId).classList.add('active');
+  if (screenId === 'screen-dashboard') {
+    document.body.classList.add('scrollable');
+    window.scrollTo(0, 0);
+    loadDashboard();
+  } else {
+    document.body.classList.remove('scrollable');
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  MINI-JEU — GEOMETRY DASH LIKE
+// ═══════════════════════════════════════════════
+const CONFIGS = {
+  facile:    { speed: 5,  obstFreq: 110, length: 2000, label: 'FACILE',    burstChance: 0,    movingChance: 0    },
+  moyen:     { speed: 7,  obstFreq: 80,  length: 3000, label: 'MOYEN',     burstChance: 0.35, movingChance: 0.35 },
+  difficile: { speed: 10, obstFreq: 50,  length: 4000, label: 'DIFFICILE', burstChance: 0.65, movingChance: 0.55 },
+};
+
+const PALETTE = {
+  bg:       '#0d0d1a',
+  player:   '#00ff88',
+  obstacle: ['#ff2d78', '#ffd700', '#ff6b35'],
+  ground:   '#222244',
+  stroke:   '#000000',
+};
+
+function startGame(diff) {
+  currentDiff = diff;
+  goTo('screen-jeu');
+  document.getElementById('diffLabel').textContent = CONFIGS[diff].label;
+  runGame(diff);
+}
+
+function retryGame() { startGame(currentDiff); }
+
+function runGame(diff) {
+  if (gameLoop) cancelAnimationFrame(gameLoop);
+
+  const canvas  = document.getElementById('gameCanvas');
+  const ctx     = canvas.getContext('2d');
+  const cfg     = CONFIGS[diff];
+  const W       = canvas.width;
+  const H       = canvas.height;
+  const GROUND  = H - 50;
+  const PX      = 80;
+
+  // Personnage
+  const player = {
+    x: PX, y: GROUND - 40,
+    w: 36, h: 36,
+    vy: 0,
+    onGround: true,
+    eyePhase: 0,
+  };
+
+  const GRAVITY    = 0.55;
+  const JUMP_INIT  = -7;   // petit saut de base (tap rapide)
+  const JUMP_BOOST = -0.65; // force ajoutée par frame de maintien
+  const BOOST_MAX  = 18;   // frames max de boost → grand saut
+
+  // Obstacles
+  let obstacles   = [];
+  let frameCount  = 0;
+  let distance    = 0;
+  let alive       = true;
+  let won         = false;
+  let inputHeld   = false;
+  let boostFrames = 0;
+
+  // Nuage de particules victoire
+  let particles  = [];
+
+  function jump() {
+    if (player.onGround && alive) {
+      player.vy      = JUMP_INIT;
+      player.onGround = false;
+      boostFrames    = BOOST_MAX;
+    }
+  }
+
+  // Inputs clavier
+  function onKeyDown(e) {
+    if (e.code === 'Space') {
+      e.preventDefault();
+      if (!inputHeld) { inputHeld = true; jump(); }
+    }
+  }
+  function onKeyUp(e) {
+    if (e.code === 'Space') inputHeld = false;
+  }
+
+  // Inputs souris
+  function onMouseDown() { inputHeld = true; jump(); }
+  function onMouseUp()   { inputHeld = false; }
+
+  canvas.addEventListener('mousedown', onMouseDown);
+  canvas.addEventListener('mouseup',   onMouseUp);
+  window.addEventListener('keydown',   onKeyDown);
+  window.addEventListener('keyup',     onKeyUp);
+
+  function cleanup() {
+    canvas.removeEventListener('mousedown', onMouseDown);
+    canvas.removeEventListener('mouseup',   onMouseUp);
+    window.removeEventListener('keydown',   onKeyDown);
+    window.removeEventListener('keyup',     onKeyUp);
+  }
+
+  // Génère un obstacle (sol ou oscillant)
+  function makeObstacle(offsetX = 0) {
+    const color = PALETTE.obstacle[Math.floor(Math.random() * PALETTE.obstacle.length)];
+
+    // Obstacle oscillant (hauteur qui pulse depuis le sol)
+    if (Math.random() < cfg.movingChance) {
+      const baseH = 38 + Math.random() * 28;
+      const amp   = 18 + Math.random() * 22; // amplitude oscillation
+      const w     = 30 + Math.random() * 22;
+      return {
+        x: W + 20 + offsetX, w,
+        baseH, h: baseH, amp,
+        movePhase: Math.random() * Math.PI * 2,
+        y: GROUND - baseH,
+        shape: 'moving', color: '#ff6b35', moving: true,
+      };
+    }
+
+    // Obstacle classique
+    const shapes = ['rect', 'spike', 'wide', 'tall'];
+    const shape  = shapes[Math.floor(Math.random() * shapes.length)];
+    let w, h;
+    if (shape === 'rect')  { w = 28 + Math.random()*18; h = 36 + Math.random()*28; }
+    if (shape === 'spike') { w = 24 + Math.random()*14; h = 50 + Math.random()*22; }
+    if (shape === 'wide')  { w = 52 + Math.random()*32; h = 26 + Math.random()*16; }
+    if (shape === 'tall')  { w = 22 + Math.random()*12; h = 68 + Math.random()*30; }
+    return { x: W + 20 + offsetX, y: GROUND - h, w, h, shape, color, moving: false };
+  }
+
+  function drawObstacle(o) {
+    ctx.save();
+    ctx.strokeStyle = PALETTE.stroke;
+    ctx.lineWidth   = 3;
+    ctx.fillStyle   = o.color;
+    if (o.shape === 'spike') {
+      ctx.beginPath();
+      ctx.moveTo(o.x + o.w/2, o.y);
+      ctx.bezierCurveTo(o.x + o.w*0.9, o.y + o.h*0.4, o.x + o.w, o.y + o.h, o.x + o.w, o.y + o.h);
+      ctx.lineTo(o.x, o.y + o.h);
+      ctx.bezierCurveTo(o.x, o.y + o.h*0.4, o.x + o.w*0.1, o.y + o.h*0.4, o.x + o.w/2, o.y);
+      ctx.fill(); ctx.stroke();
+    } else if (o.shape === 'moving') {
+      // Obstacle oscillant : rectangle avec chevrons qui indiquent le mouvement
+      ctx.beginPath();
+      ctx.rect(o.x, o.y, o.w, o.h);
+      ctx.fill(); ctx.stroke();
+      // Chevrons décoratifs
+      ctx.strokeStyle = '#fff5';
+      ctx.lineWidth = 2;
+      const mid = o.y + o.h / 2;
+      ctx.beginPath(); ctx.moveTo(o.x+6, mid-6); ctx.lineTo(o.x+o.w/2, mid+6); ctx.lineTo(o.x+o.w-6, mid-6); ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.rect(o.x, o.y, o.w, o.h);
+      ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawPlayer() {
+    player.eyePhase += 0.08;
+    ctx.save();
+    // Corps
+    ctx.fillStyle   = PALETTE.player;
+    ctx.strokeStyle = PALETTE.stroke;
+    ctx.lineWidth   = 3;
+    ctx.beginPath();
+    ctx.rect(player.x, player.y, player.w, player.h);
+    ctx.fill(); ctx.stroke();
+    // Yeux
+    const eyeOffY = Math.sin(player.eyePhase) * 3;
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.arc(player.x+10, player.y+12+eyeOffY, 5, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(player.x+26, player.y+12+eyeOffY, 5, 0, Math.PI*2); ctx.fill();
+    // Reflets
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(player.x+12, player.y+10+eyeOffY, 2, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(player.x+28, player.y+10+eyeOffY, 2, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawGround() {
+    ctx.fillStyle   = PALETTE.ground;
+    ctx.strokeStyle = PALETTE.stroke;
+    ctx.lineWidth   = 2;
+    ctx.beginPath();
+    ctx.rect(0, GROUND, W, H - GROUND);
+    ctx.fill(); ctx.stroke();
+    // Lignes décoratives
+    ctx.strokeStyle = '#3a3a6a';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 8; i++) {
+      const lx = ((frameCount * cfg.speed * 0.3) + i * 90) % (W + 90) - 90;
+      ctx.beginPath(); ctx.moveTo(lx, GROUND); ctx.lineTo(lx + 60, GROUND); ctx.stroke();
+    }
+  }
+
+  function drawBg() {
+    ctx.fillStyle = PALETTE.bg;
+    ctx.fillRect(0, 0, W, H);
+    // Étoiles fixes
+    ctx.fillStyle = '#ffffff22';
+    const stars = [[50,30],[120,80],[200,20],[350,60],[500,15],[620,45],[680,90],[150,110],[400,100]];
+    stars.forEach(([sx,sy]) => {
+      ctx.beginPath(); ctx.arc(sx, sy, 1.5, 0, Math.PI*2); ctx.fill();
+    });
+  }
+
+  function drawHUD() {
+    const pct = Math.min(100, Math.floor((distance / cfg.length) * 100));
+    document.getElementById('progressLabel').textContent = pct + '%';
+    // Barre de progression
+    ctx.fillStyle = '#222';
+    ctx.fillRect(W - 120, 10, 100, 8);
+    ctx.fillStyle = '#00ff88';
+    ctx.fillRect(W - 120, 10, pct, 8);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(W - 120, 10, 100, 8);
+  }
+
+  function spawnParticles() {
+    for (let i = 0; i < 40; i++) {
+      particles.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        vx: (Math.random()-0.5)*6,
+        vy: (Math.random()-0.5)*6,
+        life: 60,
+        color: PALETTE.obstacle[Math.floor(Math.random()*PALETTE.obstacle.length)],
+        r: 4 + Math.random()*8,
+      });
+    }
+  }
+
+  function drawParticles() {
+    particles = particles.filter(p => p.life > 0);
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy; p.life--;
+      ctx.globalAlpha = p.life / 60;
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+  }
+
+  function collides(a, b) {
+    const pad = 4;
+    return a.x + pad < b.x + b.w &&
+           a.x + a.w - pad > b.x &&
+           a.y + pad < b.y + b.h &&
+           a.y + a.h - pad > b.y;
+  }
+
+  function frame() {
+    frameCount++;
+    distance += cfg.speed;
+
+    // Boost de saut proportionnel à la durée de maintien
+    if (inputHeld && boostFrames > 0 && player.vy < 0) {
+      player.vy += JUMP_BOOST;
+      boostFrames--;
+    } else if (!inputHeld) {
+      boostFrames = 0;
+    }
+    player.vy += GRAVITY;
+    player.y  += player.vy;
+
+    if (player.y >= GROUND - player.h) {
+      player.y = GROUND - player.h;
+      player.vy = 0;
+      player.onGround = true;
+    }
+
+    // Spawn obstacles
+    if (frameCount % cfg.obstFreq === 0 && distance < cfg.length - 300) {
+      obstacles.push(makeObstacle());
+      // Burst : 2e obstacle proche
+      if (Math.random() < cfg.burstChance) {
+        const gap = 55 + Math.random() * 35;
+        obstacles.push(makeObstacle(gap + 30));
+      }
+      // Double burst (difficile seulement) : 3e obstacle
+      if (cfg.burstChance >= 0.6 && Math.random() < 0.3) {
+        const gap2 = 120 + Math.random() * 40;
+        obstacles.push(makeObstacle(gap2 + 30));
+      }
+    }
+
+    // Déplacer + animer obstacles
+    obstacles.forEach(o => {
+      o.x -= cfg.speed;
+      if (o.moving) {
+        o.movePhase += 0.045;
+        o.h = o.baseH + Math.abs(Math.sin(o.movePhase)) * o.amp;
+        o.y = GROUND - o.h;
+      }
+    });
+    obstacles = obstacles.filter(o => o.x + o.w > -20);
+
+    // Collisions
+    for (const o of obstacles) {
+      if (collides(player, o)) {
+        alive = false;
+        break;
+      }
+    }
+
+    // Victoire
+    if (distance >= cfg.length && alive) {
+      won = true;
+    }
+
+    // ── DESSIN ──
+    drawBg();
+    drawGround();
+    obstacles.forEach(drawObstacle);
+    drawPlayer();
+    if (won) drawParticles();
+    drawHUD();
+
+    if (!alive) {
+      // Flash rouge
+      ctx.fillStyle = '#ff000033';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#ff2d78';
+      ctx.font = 'bold 48px Courier New';
+      ctx.textAlign = 'center';
+      ctx.fillText('💀', W/2, H/2 - 10);
+      cleanup();
+      setTimeout(() => goTo('screen-gameover'), 700);
+      return;
+    }
+
+    if (won) {
+      spawnParticles();
+      if (diff === 'difficile') {
+        // Récompense spéciale — fond doré + couronne
+        ctx.fillStyle = '#ffd70044';
+        ctx.fillRect(0, 0, W, H);
+        ctx.font = 'bold 56px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillText('👑', W/2, H/2 - 20);
+        ctx.fillStyle = '#ffd700';
+        ctx.font = 'bold 28px Courier New';
+        ctx.fillText('LÉGENDAIRE !', W/2, H/2 + 24);
+        ctx.fillStyle = '#fff';
+        ctx.font = '16px Courier New';
+        ctx.fillText('Tu es complètement fou.', W/2, H/2 + 52);
+      } else {
+        ctx.fillStyle = '#00ff88cc';
+        ctx.font = 'bold 36px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillText('🎉 VALIDÉ !', W/2, H/2);
+      }
+      cleanup();
+      niveauValide = true;
+      setTimeout(() => {
+        if (diff === 'difficile') showVictoireLegendaire();
+        else showVictoireNormale(diff);
+      }, 1200);
+      return;
+    }
+
+    gameLoop = requestAnimationFrame(frame);
+  }
+
+  gameLoop = requestAnimationFrame(frame);
+}
+
+// ═══════════════════════════════════════════════
+//  DASHBOARD — APPELS APIs
+// ═══════════════════════════════════════════════
+function loadDashboard() {
+  const grid = document.getElementById('apiGrid');
+  grid.innerHTML = '';
+
+  const apis = [
+    { id: 'meteo',      icon: '🌤️',  title: 'Météo',                fetch: fetchMeteo      },
+    { id: 'heure',      icon: '🕐',  title: 'Heure (Paris)',         fetch: fetchHeure      },
+    { id: 'worldclock', icon: '🌍',  title: 'Horloges mondiales',    fetch: fetchWorldClock },
+    { id: 'sunrise',    icon: '🌅',  title: 'Lever / Coucher',       fetch: fetchSunrise    },
+    { id: 'blague',     icon: '😂',  title: 'Blague du jour',        fetch: fetchBlague     },
+    { id: 'dadjoke',    icon: '😅',  title: 'Dad Joke',              fetch: fetchDadJoke    },
+    { id: 'conseil',    icon: '💡',  title: 'Conseil du jour',       fetch: fetchConseil    },
+    { id: 'quote',      icon: '💬',  title: 'Citation inspirante',   fetch: fetchQuote      },
+    { id: 'chat',       icon: '🐱',  title: 'Fait sur les chats',    fetch: fetchChat       },
+    { id: 'quiz',       icon: '🎯',  title: 'Culture générale',      fetch: fetchQuiz       },
+    { id: 'wiki',       icon: '📖',  title: 'Wikipedia aléatoire',   fetch: fetchWiki       },
+    { id: 'iss',        icon: '🛰️',  title: 'Position ISS',          fetch: fetchISS        },
+    { id: 'change',     icon: '💶',  title: 'Taux de change',        fetch: fetchChange     },
+  ];
+
+  apis.forEach(api => {
+    const card = document.createElement('div');
+    card.className = 'api-card';
+    card.id = 'card-' + api.id;
+    card.innerHTML = `
+      <div class="api-icon">${api.icon}</div>
+      <div class="api-title">${api.title}</div>
+      <div class="api-content loading" id="content-${api.id}">
+        <span class="spinner"></span> Chargement...
+      </div>`;
+    grid.appendChild(card);
+
+    api.fetch().then(html => {
+      const el = document.getElementById('content-' + api.id);
+      if (el) { el.classList.remove('loading'); el.innerHTML = html; }
+    }).catch(() => {
+      const card = document.getElementById('card-' + api.id);
+      if (card) card.remove(); // Dégradation silencieuse
+    });
+  });
+}
+
+async function fetchMeteo() {
+  const r = await fetch('https://api.open-meteo.com/v1/forecast?latitude=48.85&longitude=2.35&current_weather=true');
+  const d = await r.json();
+  const w = d.current_weather;
+  const codes = {0:'Ciel dégagé',1:'Quasi dégagé',2:'Partiellement nuageux',3:'Couvert',45:'Brouillard',48:'Brouillard givrant',51:'Bruine légère',61:'Pluie légère',71:'Neige légère',80:'Averses légères',95:'Orage'};
+  const desc = codes[w.weathercode] || 'Conditions variées';
+  const icon = w.temperature > 20 ? '☀️' : w.temperature > 10 ? '🌤️' : '❄️';
+  return `${icon} <strong>${Math.round(w.temperature)}°C</strong><br><small>${desc} — vent ${w.windspeed} km/h</small><br><small style="color:#555">Paris, FR</small>`;
+}
+
+async function fetchHeure() {
+  const r = await fetch('https://worldtimeapi.org/api/timezone/Europe/Paris');
+  const d = await r.json();
+  const dt = new Date(d.datetime);
+  const h = dt.getHours().toString().padStart(2,'0');
+  const m = dt.getMinutes().toString().padStart(2,'0');
+  const s = dt.getSeconds().toString().padStart(2,'0');
+  const jour = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'][dt.getDay()];
+  return `⏱️ <strong style="font-size:1.4rem">${h}:${m}:${s}</strong><br><small>${jour} ${dt.toLocaleDateString('fr-FR')}</small><br><small style="color:#555">Europe/Paris</small>`;
+}
+
+async function fetchBlague() {
+  let r, d;
+  try {
+    r = await fetch('https://v2.jokeapi.dev/joke/Any?lang=fr&type=single&blacklistFlags=nsfw,racist');
+    d = await r.json();
+    if (d.error) throw new Error();
+  } catch {
+    r = await fetch('https://v2.jokeapi.dev/joke/Programming,Misc?type=single&blacklistFlags=nsfw');
+    d = await r.json();
+  }
+  return `😄 ${d.joke || d.delivery || 'Pas de blague aujourd\'hui...'}`;
+}
+
+async function fetchConseil() {
+  const r = await fetch(`https://api.adviceslip.com/advice?t=${Date.now()}`);
+  const d = await r.json();
+  return `💬 <em>"${d.slip.advice}"</em>`;
+}
+
+async function fetchChat() {
+  const r = await fetch('https://catfact.ninja/fact');
+  const d = await r.json();
+  return `🐾 ${d.fact}`;
+}
+
+async function fetchQuiz() {
+  const r = await fetch('https://opentdb.com/api.php?amount=1&type=multiple');
+  const d = await r.json();
+  if (!d.results || d.results.length === 0) throw new Error();
+  const q = d.results[0];
+  const decode = s => { const txt = document.createElement('textarea'); txt.innerHTML = s; return txt.value; };
+  const question  = decode(q.question);
+  const answer    = decode(q.correct_answer);
+  const category  = decode(q.category);
+  return `<small style="color:#ffd700">${category}</small><br>${question}<br>
+    <button class="reveal-btn" onclick="this.textContent='✅ ${answer.replace(/'/g,"\\'")}';this.disabled=true;">
+      Révéler la réponse
+    </button>`;
+}
+
+async function fetchChange() {
+  const r = await fetch('https://api.frankfurter.app/latest?from=EUR&to=USD,GBP,JPY');
+  const d = await r.json();
+  const rates = d.rates;
+  return `<strong>1 EUR =</strong><br>
+    🇺🇸 ${rates.USD?.toFixed(4)} USD<br>
+    🇬🇧 ${rates.GBP?.toFixed(4)} GBP<br>
+    🇯🇵 ${rates.JPY?.toFixed(2)} JPY`;
+}
+
+async function fetchWorldClock() {
+  const zones = [
+    { tz: 'America/New_York',  flag: '🇺🇸', label: 'New York'  },
+    { tz: 'Asia/Tokyo',        flag: '🇯🇵', label: 'Tokyo'     },
+    { tz: 'Australia/Sydney',  flag: '🇦🇺', label: 'Sydney'    },
+    { tz: 'America/Sao_Paulo', flag: '🇧🇷', label: 'São Paulo' },
+  ];
+  const results = await Promise.all(
+    zones.map(z => fetch(`https://worldtimeapi.org/api/timezone/${z.tz}`).then(r => r.json()))
+  );
+  return results.map((d, i) => {
+    const dt = new Date(d.datetime);
+    const h  = dt.getHours().toString().padStart(2, '0');
+    const m  = dt.getMinutes().toString().padStart(2, '0');
+    return `${zones[i].flag} ${zones[i].label} : <strong>${h}:${m}</strong>`;
+  }).join('<br>');
+}
+
+async function fetchSunrise() {
+  const r = await fetch('https://api.sunrise-sunset.org/json?lat=48.85&lng=2.35&formatted=0');
+  const d = await r.json();
+  const fmt = iso => new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+  const sunrise = fmt(d.results.sunrise);
+  const sunset  = fmt(d.results.sunset);
+  const noon    = fmt(d.results.solar_noon);
+  return `🌅 Lever : <strong>${sunrise}</strong><br>
+    ☀️ Midi solaire : <strong>${noon}</strong><br>
+    🌇 Coucher : <strong>${sunset}</strong><br>
+    <small style="color:#555">Paris, aujourd'hui</small>`;
+}
+
+async function fetchQuote() {
+  const r = await fetch('https://api.quotable.io/random?maxLength=120');
+  const d = await r.json();
+  return `<em>"${d.content}"</em><br><small style="color:#ffd700">— ${d.author}</small>`;
+}
+
+async function fetchWiki() {
+  const r = await fetch('https://en.wikipedia.org/api/rest_v1/page/random/summary');
+  const d = await r.json();
+  const extract = d.extract ? d.extract.substring(0, 130) + '…' : 'Pas de résumé disponible.';
+  return `<strong style="color:#ffd700">${d.title}</strong><br><small>${extract}</small>`;
+}
+
+async function fetchISS() {
+  const r = await fetch('https://api.wheretheiss.at/v1/satellites/25544');
+  const d = await r.json();
+  return `Lat : <strong>${d.latitude.toFixed(2)}°</strong><br>
+    Lon : <strong>${d.longitude.toFixed(2)}°</strong><br>
+    Alt : <strong>${Math.round(d.altitude)} km</strong><br>
+    Vitesse : <strong>${Math.round(d.velocity)} km/h</strong>`;
+}
+
+async function fetchDadJoke() {
+  const r = await fetch('https://icanhazdadjoke.com/', { headers: { Accept: 'application/json' } });
+  const d = await r.json();
+  return `🥁 ${d.joke}`;
+}
+</script>
+</body>
+</html>

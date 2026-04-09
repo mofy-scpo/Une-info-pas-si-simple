@@ -1,0 +1,6 @@
+# Claude Code internal config (settings locaux, non destinés au repo public)
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
