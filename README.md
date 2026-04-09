@@ -2,6 +2,8 @@
 
 > Parce que savoir la météo, ça se mérite.
 
+**[Jouer maintenant](https://mofy-scpo.github.io/Une-info-pas-si-simple/)**
+
 ---
 
 ## C'est quoi ce truc ?
